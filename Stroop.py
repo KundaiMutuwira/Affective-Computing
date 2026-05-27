@@ -3,13 +3,8 @@ from datetime import datetime
 import random
 import csv
 import os
-import time
 
-def unix_us():
-    """Return current UTC Unix time in microseconds (matches EmbracePlus format)."""
-    return int(time.time() * 1_000_000)
-
-# Participant info dialog
+# ----------------- Participant info dialog -------------------------#
 participant_info = {"Participant Name": ""}
 
 dlg = gui.DlgFromDict(participant_info, title="Participant Information")
@@ -21,7 +16,7 @@ participant_name = participant_info["Participant Name"]
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # folder where THIS script is located
-save_folder = r"./results"
+save_folder = r"C:/Users/Dell/Documents/Masters/2B/Affective/results"
 
 if not os.path.exists(save_folder):
     os.makedirs(save_folder)
@@ -30,8 +25,7 @@ filename = os.path.join(
     save_folder,
     f"stroop_{participant_name}_{timestamp}.csv")
 
-
-# Window setup
+# ------------------------- Window setup -------------------------#
 win = visual.Window(size=(1800, 1000), color="black", units='norm', fullscr=False)
 text_stim = visual.TextStim( win, text="", height=0.15, color="black", wrapWidth=1.8, alignHoriz='center', alignVert='center')
 feedback_stim = visual.TextStim(win, text="", height=0.25, color="white")
@@ -39,18 +33,19 @@ bg_rect = visual.Rect( win, width=1.2, height=0.45, fillColor="white", lineColor
 fixation = visual.TextStim(win,text="+",color="white",height=0.1)
 timer_stim = visual.TextStim(win, text="", height=0.2, color="white", pos=(0.5, 0.8))
 
+# ------------------------- Helper Functions -------------------------#
 # Fixation display
 def show_fixation(duration=0.5):
-
     fixation.draw()
     win.flip()
     core.wait(duration)
 
 # Trial generation
 def generate_trial():
-    words = ["RED", "GREEN", "BLUE", "YELLOW", "ORANGE", "PURPLE", "WHITE","BROWN"]
+    words = ["RED", "GREEN", "BLUE", "YELLOW", "ORANGE", "PURPLE", "WHITE","BROWN", "PINK", "GRAY"]
     colors_map = { "RED": "red","GREEN": "green", "BLUE": "blue", "YELLOW": "yellow", 
-                  "ORANGE": "orange", "PURPLE": "purple", "WHITE": "white", "BROWN": "brown" }
+                   "ORANGE": "orange", "PURPLE": "purple", "WHITE": "white", "BROWN": "brown", 
+                   "PINK": "pink", "GRAY": "gray" }
 
     word = random.choice(words)
     is_match = random.choice([True, False])
@@ -62,7 +57,7 @@ def generate_trial():
 
 # Message display
 def show_message(msg):
-    stim = visual.TextStim(win, text=msg, color="white", height=0.06, wrapWidth=1.6)
+    stim = visual.TextStim(win, text=msg, color="white", height=0.08, wrapWidth=1.6)
     while True:
         stim.draw()
         win.flip()
@@ -73,8 +68,28 @@ def show_message(msg):
             win.close()
             core.quit()
 
-# Practice block
-def run_practice(n=10):
+# Break display
+def show_break_timer(duration=60):
+    timer = core.CountdownTimer(duration)
+    msg = visual.TextStim(win, text="Baseline complete.\n\nTake a break before the stress block.\nPress SPACE to end break.",
+                          color="white", height=0.1, pos=(0, 0.2))
+    countdown = visual.TextStim(win, text="", color="cyan", height=0.15, pos=(0, -0.2))
+
+    while timer.getTime() > 0:
+        remaining = int(timer.getTime())
+        countdown.text = f"{remaining:}s" 
+        msg.draw()
+        countdown.draw()
+        win.flip()
+        keys = event.getKeys()
+        if "space" in keys:
+            return
+        if 'escape' in event.getKeys():
+            win.close()
+            core.quit()
+
+# ------------------ Practice block ------------------------
+def run_practice(n=5):
     data = []
 
     for i in range(n):
@@ -82,8 +97,10 @@ def run_practice(n=10):
         show_fixation(0.5)
         word, color, is_match = generate_trial()
 
+        # Timestamp for HR correlation
+        trial_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+
         responded = False
-        onset_unix = None
         clock = core.Clock()
 
         while not responded:
@@ -95,14 +112,11 @@ def run_practice(n=10):
             text_stim.draw()
 
             win.flip()
-            if onset_unix is None:
-                onset_unix = unix_us()
 
             keys = event.getKeys(keyList=["left", "right", "escape"], timeStamped=clock)
 
             if keys:
                 key, rt = keys[0]
-                response_unix = unix_us()
                 if key == "escape":
                     win.close()
                     core.quit()
@@ -115,17 +129,9 @@ def run_practice(n=10):
         win.flip()
         core.wait(0.5)
 
-        data.append({
-            "block": "practice",
-            "trial": i+1,
-            "word": word,
-            "color": color,
-            "is_match": is_match,
-            "key": key,
-            "rt": rt,
-            "correct": correct,
-            "onset_unix": onset_unix,
-            "response_unix": response_unix
+        data.append({ "block": "practice", "trial": i+1,"trail_timestamp": trial_ts,
+            "word": word, "color": color, "is_match": is_match, "key": key, "rt": rt,
+            "correct": correct
         })
 
     return data
@@ -134,7 +140,7 @@ def run_practice(n=10):
 # =========================
 # BASELINE (UNSTRESSED COGNITIVE LOAD)
 # =========================
-def run_baseline(n=25):
+def run_baseline(n=50):
     data = []
 
     for i in range(n):
@@ -142,8 +148,9 @@ def run_baseline(n=25):
         show_fixation(0.5)
         word, color, is_match = generate_trial()
 
+        # Timestamp for HR correlation
+        trial_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
         responded = False
-        onset_unix = None
         clock = core.Clock()
 
         while not responded:
@@ -155,14 +162,11 @@ def run_baseline(n=25):
             text_stim.draw()
 
             win.flip()
-            if onset_unix is None:
-                onset_unix = unix_us()
 
             keys = event.getKeys(keyList=["left", "right", "escape"], timeStamped=clock)
 
             if keys:
                 key, rt = keys[0]
-                response_unix = unix_us()
                 if key == "escape":
                     win.close()
                     core.quit()
@@ -173,14 +177,13 @@ def run_baseline(n=25):
         data.append({
             "block": "baseline",
             "trial": i+1,
+            "trail_timestamp": trial_ts,
             "word": word,
             "color": color,
             "is_match": is_match,
             "key": key,
             "rt": rt,
-            "correct": correct,
-            "onset_unix": onset_unix,
-            "response_unix": response_unix
+            "correct": correct
         })
 
         core.wait(0.3)
@@ -191,7 +194,7 @@ def run_baseline(n=25):
 # =========================
 # ADAPTIVE STRESS
 # =========================
-def run_adaptive_stress(n=40, start_time_limit=3.5):
+def run_adaptive_stress(n=150, start_time_limit=4):
     data = []
     time_limit = start_time_limit
     consecutive = 0
@@ -201,10 +204,11 @@ def run_adaptive_stress(n=40, start_time_limit=3.5):
         show_fixation(random.uniform(0.4, 0.8))
         word, color, is_match = generate_trial()
 
+        # Timestamp for HR correlation
+        trial_ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+
         responded = False
         timed_out = False
-        onset_unix = None
-        response_unix = None
         clock = core.Clock()
 
         while not responded:
@@ -225,14 +229,11 @@ def run_adaptive_stress(n=40, start_time_limit=3.5):
             timer_stim.draw()   
 
             win.flip()
-            if onset_unix is None:
-                onset_unix = unix_us()
 
             keys = event.getKeys(keyList=["left", "right", "escape"], timeStamped=clock)
 
             if keys:
                 key, rt = keys[0]
-                response_unix = unix_us()
                 if key == "escape":
                     win.close()
                     core.quit()
@@ -243,7 +244,6 @@ def run_adaptive_stress(n=40, start_time_limit=3.5):
             elif clock.getTime() >= time_limit:
                 key = "timeout"
                 rt = time_limit
-                response_unix = unix_us()
                 correct = False
                 timed_out = True
                 responded = True
@@ -251,13 +251,13 @@ def run_adaptive_stress(n=40, start_time_limit=3.5):
         # adaptive difficulty
         if correct and not timed_out:
             consecutive += 1
-            if consecutive >= 3:
-                time_limit = max(1.0, time_limit - 0.5)
+            if consecutive >= 5:
+                time_limit = max(0.5, time_limit - 0.25)
                 consecutive = 0
         else:
             consecutive = 0
 
-        feedback_stim.text = ":)" if correct else ":o !"
+        feedback_stim.text = "✓" if correct else "✗"
         feedback_stim.color = "white"
         feedback_stim.draw()
         win.flip()
@@ -266,6 +266,7 @@ def run_adaptive_stress(n=40, start_time_limit=3.5):
         data.append({
             "block": "stress",
             "trial": i+1,
+            "trail_timestamp": trial_ts,
             "word": word,
             "color": color,
             "is_match": is_match,
@@ -273,9 +274,7 @@ def run_adaptive_stress(n=40, start_time_limit=3.5):
             "rt": rt,
             "correct": correct,
             "time_limit": time_limit,
-            "timed_out": timed_out,
-            "onset_unix": onset_unix,
-            "response_unix": response_unix
+            "timed_out": timed_out
         })
 
         core.wait(0.2)
@@ -289,11 +288,8 @@ def save_data(all_data, filename):
         print("No data to save.")
         return
     
-    fieldnames = ["block","trial", "word", "color","is_match","key", "rt","correct","time_limit","timed_out","onset_unix","response_unix"]
+    fieldnames = ["block","trial", "trail_timestamp", "rt","correct","time_limit","timed_out"]
     with open(filename, "w", newline="", encoding="utf-8") as f:
-        f.write(f"# session_start_unix_us={session_start_unix}\n")
-        f.write(f"# sync_tap_start_unix_us={sync_tap_start_unix}\n")
-        f.write(f"# sync_tap_end_unix_us={sync_tap_end_unix}\n")
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
 
@@ -315,17 +311,6 @@ def save_data(all_data, filename):
 # MAIN EXPERIMENT
 # =========================
 try:
-    session_start_unix = unix_us()
-
-    # --- EmbracePlus sync tap (start) ---
-    # Researcher taps the watch 3 times, then presses SPACE.
-    # The 3 ACC spikes near sync_tap_start_unix are the start alignment anchor.
-    show_message(
-        "SYNC START: Tap the EmbracePlus watch 3 times NOW,\n"
-        "then press SPACE"
-    )
-    sync_tap_start_unix = unix_us()
-
     show_message(
         "Welcome to our Stroop Game\n\n"
         "If color matches the word press Right Arrow \n If color does NOT match the word press Left Arrow\n\n"
@@ -336,18 +321,14 @@ try:
     practice = run_practice(5)
 
     show_message("Baseline starting\nPress SPACE")
-    baseline = run_baseline(20)
+    baseline = run_baseline(50)
+
+    show_break_timer(duration=60)
 
     show_message("Stress block starting\nPress SPACE")
-    stress = run_adaptive_stress(40)
+    stress = run_adaptive_stress(150)
 
-    # --- EmbracePlus sync tap (end) ---
-    # Second tap gives a second anchor to measure clock drift over the session.
-    show_message(
-        "SYNC END: Tap the EmbracePlus watch 3 times NOW,\n"
-        "then press SPACE to save & exit"
-    )
-    sync_tap_end_unix = unix_us()
+    show_message("Done. Press SPACE to save & exit")
 
     #(practice + baseline + stress)
     # saving data

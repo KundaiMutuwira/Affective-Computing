@@ -3,6 +3,11 @@ from datetime import datetime
 import random
 import csv
 import os
+import time
+
+def unix_us():
+    """Return current UTC Unix time in microseconds (matches EmbracePlus format)."""
+    return int(time.time() * 1_000_000)
 
 # Participant info dialog
 participant_info = {"Participant Name": ""}
@@ -78,6 +83,7 @@ def run_practice(n=10):
         word, color, is_match = generate_trial()
 
         responded = False
+        onset_unix = None
         clock = core.Clock()
 
         while not responded:
@@ -89,11 +95,14 @@ def run_practice(n=10):
             text_stim.draw()
 
             win.flip()
+            if onset_unix is None:
+                onset_unix = unix_us()
 
             keys = event.getKeys(keyList=["left", "right", "escape"], timeStamped=clock)
 
             if keys:
                 key, rt = keys[0]
+                response_unix = unix_us()
                 if key == "escape":
                     win.close()
                     core.quit()
@@ -114,7 +123,9 @@ def run_practice(n=10):
             "is_match": is_match,
             "key": key,
             "rt": rt,
-            "correct": correct
+            "correct": correct,
+            "onset_unix": onset_unix,
+            "response_unix": response_unix
         })
 
     return data
@@ -132,6 +143,7 @@ def run_baseline(n=25):
         word, color, is_match = generate_trial()
 
         responded = False
+        onset_unix = None
         clock = core.Clock()
 
         while not responded:
@@ -143,11 +155,14 @@ def run_baseline(n=25):
             text_stim.draw()
 
             win.flip()
+            if onset_unix is None:
+                onset_unix = unix_us()
 
             keys = event.getKeys(keyList=["left", "right", "escape"], timeStamped=clock)
 
             if keys:
                 key, rt = keys[0]
+                response_unix = unix_us()
                 if key == "escape":
                     win.close()
                     core.quit()
@@ -163,7 +178,9 @@ def run_baseline(n=25):
             "is_match": is_match,
             "key": key,
             "rt": rt,
-            "correct": correct
+            "correct": correct,
+            "onset_unix": onset_unix,
+            "response_unix": response_unix
         })
 
         core.wait(0.3)
@@ -186,6 +203,8 @@ def run_adaptive_stress(n=40, start_time_limit=3.5):
 
         responded = False
         timed_out = False
+        onset_unix = None
+        response_unix = None
         clock = core.Clock()
 
         while not responded:
@@ -206,11 +225,14 @@ def run_adaptive_stress(n=40, start_time_limit=3.5):
             timer_stim.draw()   
 
             win.flip()
+            if onset_unix is None:
+                onset_unix = unix_us()
 
             keys = event.getKeys(keyList=["left", "right", "escape"], timeStamped=clock)
 
             if keys:
                 key, rt = keys[0]
+                response_unix = unix_us()
                 if key == "escape":
                     win.close()
                     core.quit()
@@ -221,6 +243,7 @@ def run_adaptive_stress(n=40, start_time_limit=3.5):
             elif clock.getTime() >= time_limit:
                 key = "timeout"
                 rt = time_limit
+                response_unix = unix_us()
                 correct = False
                 timed_out = True
                 responded = True
@@ -250,7 +273,9 @@ def run_adaptive_stress(n=40, start_time_limit=3.5):
             "rt": rt,
             "correct": correct,
             "time_limit": time_limit,
-            "timed_out": timed_out
+            "timed_out": timed_out,
+            "onset_unix": onset_unix,
+            "response_unix": response_unix
         })
 
         core.wait(0.2)
@@ -264,8 +289,11 @@ def save_data(all_data, filename):
         print("No data to save.")
         return
     
-    fieldnames = ["block","trial", "word", "color","is_match","key", "rt","correct","time_limit","timed_out"]
+    fieldnames = ["block","trial", "word", "color","is_match","key", "rt","correct","time_limit","timed_out","onset_unix","response_unix"]
     with open(filename, "w", newline="", encoding="utf-8") as f:
+        f.write(f"# session_start_unix_us={session_start_unix}\n")
+        f.write(f"# sync_tap_start_unix_us={sync_tap_start_unix}\n")
+        f.write(f"# sync_tap_end_unix_us={sync_tap_end_unix}\n")
         writer = csv.DictWriter(f, fieldnames=fieldnames, extrasaction='ignore')
         writer.writeheader()
 
@@ -287,6 +315,17 @@ def save_data(all_data, filename):
 # MAIN EXPERIMENT
 # =========================
 try:
+    session_start_unix = unix_us()
+
+    # --- EmbracePlus sync tap (start) ---
+    # Researcher taps the watch 3 times, then presses SPACE.
+    # The 3 ACC spikes near sync_tap_start_unix are the start alignment anchor.
+    show_message(
+        "SYNC START: Tap the EmbracePlus watch 3 times NOW,\n"
+        "then press SPACE"
+    )
+    sync_tap_start_unix = unix_us()
+
     show_message(
         "Welcome to our Stroop Game\n\n"
         "If color matches the word press Right Arrow \n If color does NOT match the word press Left Arrow\n\n"
@@ -302,7 +341,13 @@ try:
     show_message("Stress block starting\nPress SPACE")
     stress = run_adaptive_stress(40)
 
-    show_message("Done. Press SPACE to save & exit")
+    # --- EmbracePlus sync tap (end) ---
+    # Second tap gives a second anchor to measure clock drift over the session.
+    show_message(
+        "SYNC END: Tap the EmbracePlus watch 3 times NOW,\n"
+        "then press SPACE to save & exit"
+    )
+    sync_tap_end_unix = unix_us()
 
     #(practice + baseline + stress)
     # saving data

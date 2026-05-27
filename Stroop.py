@@ -21,7 +21,7 @@ participant_name = participant_info["Participant Name"]
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
 # folder where THIS script is located
-save_folder = r"C:/Users/Dell/Documents/Masters/2B/Affective/results"
+save_folder = r"./results"
 
 if not os.path.exists(save_folder):
     os.makedirs(save_folder)

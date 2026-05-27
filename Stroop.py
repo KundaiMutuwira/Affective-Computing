@@ -15,7 +15,9 @@ if not dlg.OK:
 participant_name = participant_info["Participant Name"]
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-save_folder = "results"
+# folder where THIS script is located
+save_folder = r"C:/Users/Dell/Documents/Masters/2B/Affective/results"
+
 if not os.path.exists(save_folder):
     os.makedirs(save_folder)
 
@@ -30,6 +32,7 @@ text_stim = visual.TextStim( win, text="", height=0.15, color="black", wrapWidth
 feedback_stim = visual.TextStim(win, text="", height=0.25, color="white")
 bg_rect = visual.Rect( win, width=1.2, height=0.45, fillColor="white", lineColor=None)
 fixation = visual.TextStim(win,text="+",color="white",height=0.1)
+timer_stim = visual.TextStim(win, text="", height=0.2, color="white", pos=(0.5, 0.8))
 
 # Fixation display
 def show_fixation(duration=0.5):
@@ -40,9 +43,9 @@ def show_fixation(duration=0.5):
 
 # Trial generation
 def generate_trial():
-    words = ["RED", "GREEN", "BLUE", "YELLOW", "PURPLE", "WHITE","BROWN"]
+    words = ["RED", "GREEN", "BLUE", "YELLOW", "ORANGE", "PURPLE", "WHITE","BROWN"]
     colors_map = { "RED": "red","GREEN": "green", "BLUE": "blue", "YELLOW": "yellow", 
-                  "PURPLE": "purple", "WHITE": "white", "BROWN": "brown" }
+                  "ORANGE": "orange", "PURPLE": "purple", "WHITE": "white", "BROWN": "brown" }
 
     word = random.choice(words)
     is_match = random.choice([True, False])
@@ -193,6 +196,15 @@ def run_adaptive_stress(n=40, start_time_limit=3.5):
             text_stim.color = "black"
             text_stim.draw()
 
+            # adaptive timer display
+            remaining = max(0, time_limit - clock.getTime())
+            timer_stim.text = f"{remaining:.1f}s"
+            if remaining <= 0.25:
+                timer_stim.color = "red"
+            else:
+                timer_stim.color = "green"
+            timer_stim.draw()   
+
             win.flip()
 
             keys = event.getKeys(keyList=["left", "right", "escape"], timeStamped=clock)
@@ -282,10 +294,10 @@ try:
     )
 
     show_message("Practice starting\nPress SPACE")
-    practice = run_practice(10)
+    practice = run_practice(5)
 
     show_message("Baseline starting\nPress SPACE")
-    baseline = run_baseline(25)
+    baseline = run_baseline(20)
 
     show_message("Stress block starting\nPress SPACE")
     stress = run_adaptive_stress(40)
